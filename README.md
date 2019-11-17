@@ -1,4 +1,4 @@
-Create the index following index first:
+Create the following index first:
 ```
 CREATE NONCLUSTERED INDEX [IX_PersistedGrants_CreationTime] ON [dbo].[PersistedGrants]
 (
