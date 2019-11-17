@@ -102,7 +102,7 @@ namespace IS2CosmosMigrator
                 @$"select * from PersistedGrants
 order by CreationTime asc
 offset @offset ROWS
-FETCH NEXT @batch ROWS ONLY;",
+fetch next @batch rows only",
                 new
                 {
                     batch = opt.BatchSize,
