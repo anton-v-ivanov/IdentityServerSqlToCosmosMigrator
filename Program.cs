@@ -28,10 +28,11 @@ namespace IS2CosmosMigrator
                     try
                     {
                         SetupCosmosDbContainerAsync(opt).GetAwaiter().GetResult();
-                        var now = DateTime.UtcNow;
-                        var totalCount = GetGrantsToMigrateCountAsync(opt, now).GetAwaiter().GetResult();
-                        Console.WriteLine($"Going to migrate {totalCount} grants");
-                        MigrateDataAsync(opt, totalCount, now).GetAwaiter().GetResult();
+
+                        var totalCount = GetGrantsToMigrateCountAsync(opt).GetAwaiter().GetResult();
+                        Console.WriteLine($"Total grants: {totalCount}");
+
+                        MigrateDataAsync(opt, totalCount, DateTime.UtcNow).GetAwaiter().GetResult();
                     }
                     catch (Exception e)
                     {
@@ -60,37 +61,43 @@ namespace IS2CosmosMigrator
                 400);
         }
 
-        private static async Task<int> GetGrantsToMigrateCountAsync(CommandLineOptions opt, DateTime now)
+        private static async Task<int> GetGrantsToMigrateCountAsync(CommandLineOptions opt)
         {
             var connectionString = opt.SqlConnectionString;
             await using var db = new SqlConnection(connectionString);
             return await db.ExecuteScalarAsync<int>(new CommandDefinition(
-                @"select count(1) from PersistedGrants where Expiration > @date",
-                new { date = now },
+                @"select count(1) from PersistedGrants
+where (@time is null or CreationTime > @time)",
+                new { time = opt.StartTime },
                 commandTimeout: 300));
         }
 
         private static async Task MigrateDataAsync(CommandLineOptions opt, int totalCount, DateTime now)
         {
             var count = 0;
+            var added = 0;
             while (true)
             {
                 var sourceGrants = (await GetGrantsFromSourceAsync(opt, count)).ToArray();
                 if (!sourceGrants.Any())
                 {
-                    return;
+                    break;
                 }
 
                 var destinationGrants = sourceGrants
                     .Where(s => s.Expiration == null || s.Expiration > now)
-                    .Select(s => s.ToDestination());
+                    .Select(s => s.ToDestination())
+                    .ToArray();
 
                 await SaveToDestinationAsync(destinationGrants);
 
+                added += destinationGrants.Length;
                 count += sourceGrants.Length;
                 var percentage = (double)count / totalCount;
-                Console.WriteLine($"Migrated {count} of {totalCount} grants ({percentage:P})");
+                Console.WriteLine($"Processed {count} of {totalCount} grants ({percentage:P}), added: {destinationGrants.Length}");
             }
+
+            Console.WriteLine($"Total added grants: {added}");
         }
 
         private static async Task<IEnumerable<SqlPersistedGrant>> GetGrantsFromSourceAsync(CommandLineOptions opt,
@@ -100,13 +107,15 @@ namespace IS2CosmosMigrator
             await using var db = new SqlConnection(connectionString);
             return await db.QueryAsync<SqlPersistedGrant>(new CommandDefinition(
                 @$"select * from PersistedGrants
+where (@time is null or CreationTime > @time)
 order by CreationTime asc
 offset @offset ROWS
 fetch next @batch rows only",
                 new
                 {
                     batch = opt.BatchSize,
-                    offset
+                    offset,
+                    time = opt.StartTime
                 },
                 commandTimeout:300));
         }

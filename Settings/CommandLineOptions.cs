@@ -1,5 +1,7 @@
 ﻿// // Copyright (c) BandLab Technologies. All rights reserved.
 
+using System;
+
 using CommandLine;
 
 namespace IS2CosmosMigrator.Settings
@@ -23,5 +25,8 @@ namespace IS2CosmosMigrator.Settings
 
         [Option('c', "container", Required = false, Default = "grants", HelpText = "CosmosDB destination container name")]
         public string CosmosDbContainerName { get; set; }
+
+        [Option("start", Required = false, HelpText = "Migrate tokens with CreationTime greater than")]
+        public DateTime? StartTime { get; set; }
     }
 }
