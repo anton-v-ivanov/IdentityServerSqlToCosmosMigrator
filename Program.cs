@@ -57,7 +57,7 @@ namespace IS2CosmosMigrator
             Database database = await client.CreateDatabaseIfNotExistsAsync(opt.CosmosDbDatabaseName);
             _container = await database.CreateContainerIfNotExistsAsync(
                 opt.CosmosDbContainerName,
-                "/id",
+                "/PartitionKey",
                 400);
         }
 
@@ -86,7 +86,7 @@ where (@time is null or CreationTime > @time)",
 
                 var destinationGrants = sourceGrants
                     .Where(s => s.Expiration == null || s.Expiration > now)
-                    .Select(s => s.ToDestination())
+                    .Select(s => s.ToDestination(opt.PartitionCount))
                     .ToArray();
 
                 await SaveToDestinationAsync(destinationGrants);
@@ -106,7 +106,7 @@ where (@time is null or CreationTime > @time)",
             var connectionString = opt.SqlConnectionString;
             await using var db = new SqlConnection(connectionString);
             return await db.QueryAsync<SqlPersistedGrant>(new CommandDefinition(
-                @$"select * from PersistedGrants
+                @"select * from PersistedGrants
 where (@time is null or CreationTime > @time)
 order by CreationTime asc
 offset @offset ROWS

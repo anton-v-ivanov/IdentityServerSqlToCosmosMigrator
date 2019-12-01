@@ -26,6 +26,9 @@ namespace IS2CosmosMigrator.Settings
         [Option('c', "container", Required = false, Default = "grants", HelpText = "CosmosDB destination container name")]
         public string CosmosDbContainerName { get; set; }
 
+        [Option('p', "partitions", Required = false, Default = 256, HelpText = "CosmosDB partition count")]
+        public int PartitionCount { get; set; }
+
         [Option("start", Required = false, HelpText = "Migrate tokens with CreationTime greater than")]
         public DateTime? StartTime { get; set; }
     }

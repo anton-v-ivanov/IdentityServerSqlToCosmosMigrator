@@ -12,6 +12,8 @@ namespace IS2CosmosMigrator.Entities
         [JsonProperty("id")]
         public string Key { get; set; }
 
+        public string PartitionKey { get; set; }
+
         public string Type { get; set; }
 
         public string SubjectId { get; set; }
