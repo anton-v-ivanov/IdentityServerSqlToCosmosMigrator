@@ -74,13 +74,31 @@ where (@time is null or CreationTime > @time)",
 
         private static async Task MigrateDataAsync(CommandLineOptions opt, int totalCount, DateTime now)
         {
-            var count = 0;
+            var count = opt.Offset;
             var added = 0;
             while (true)
             {
-                var sourceGrants = (await GetGrantsFromSourceAsync(opt, count)).ToArray();
+                SqlPersistedGrant[] sourceGrants;
+                try
+                {
+                    sourceGrants = (await GetGrantsFromSourceAsync(opt, count)).ToArray();
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                    await Task.Delay(1000);
+                    continue;
+                }
+
                 if (!sourceGrants.Any())
                 {
+                    if (opt.OnlineMode)
+                    {
+                        Console.WriteLine("No grant found in DB, we're in online mode. Waiting for grants");
+                        await Task.Delay(1000);
+                        continue;
+                    }
+
                     break;
                 }
 
@@ -88,13 +106,20 @@ where (@time is null or CreationTime > @time)",
                     .Where(s => s.Expiration == null || s.Expiration > now)
                     .Select(s => s.ToDestination(opt.PartitionCount))
                     .ToArray();
-
-                await SaveToDestinationAsync(destinationGrants);
+                try
+                {
+                    await SaveToDestinationAsync(destinationGrants);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
+                }
 
                 added += destinationGrants.Length;
                 count += sourceGrants.Length;
                 var percentage = (double)count / totalCount;
-                Console.WriteLine($"Processed {count} of {totalCount} grants ({percentage:P}), added: {destinationGrants.Length}");
+                var maxTime = sourceGrants.Max(s => s.CreationTime);
+                Console.WriteLine($"Processed {count} of {totalCount} grants ({percentage:P}), added: {destinationGrants.Length}, maxTime: {maxTime}");
             }
 
             Console.WriteLine($"Total added grants: {added}");
@@ -110,14 +135,15 @@ where (@time is null or CreationTime > @time)",
 where (@time is null or CreationTime > @time)
 order by CreationTime asc
 offset @offset ROWS
-fetch next @batch rows only",
+fetch next @batch rows only
+option (table hint(PersistedGrants, index ([IX_PersistedGrants_CreationTime])))",
                 new
                 {
                     batch = opt.BatchSize,
                     offset,
                     time = opt.StartTime
                 },
-                commandTimeout:300));
+                commandTimeout:120));
         }
 
         private static async Task SaveToDestinationAsync(IEnumerable<CosmosPersistedGrant> grants)

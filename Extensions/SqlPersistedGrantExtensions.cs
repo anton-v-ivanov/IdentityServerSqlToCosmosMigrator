@@ -27,7 +27,7 @@ namespace IS2CosmosMigrator.Extensions
                 Data = JObject.Parse(source.Data),
                 TimeStamp = ((DateTimeOffset)source.CreationTime).ToUnixTimeSeconds(),
                 Ttl = source.Expiration == null
-                    ? (int?)null
+                    ? -1
                     : (int)(source.Expiration.Value - DateTime.UtcNow).TotalSeconds
             };
 

@@ -31,5 +31,11 @@ namespace IS2CosmosMigrator.Settings
 
         [Option("start", Required = false, HelpText = "Migrate tokens with CreationTime greater than")]
         public DateTime? StartTime { get; set; }
+
+        [Option('o', "offset", Required = false, Default = 0, HelpText = "Initial offset")]
+        public int Offset { get; set; }
+
+        [Option("online", Required = false, HelpText = "Constantly monitor for new grants and move them")]
+        public bool OnlineMode { get; set; }
     }
 }
